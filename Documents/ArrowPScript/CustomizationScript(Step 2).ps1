@@ -1,0 +1,105 @@
+﻿#Customization of Resources
+
+#Author: Lipsa Das, Chandan Madan Rao Kari
+
+#Login to your subscription
+Login-AzureRmAccount
+
+#Import CSV File
+$Imported = Import-Csv 'D:\CSVUpload\AccountNew.csv'
+
+  $vmName = $env:COMPUTERNAME
+  $eventhubNS = $vmName+"NS"
+  $eventhubName = $vmName+"EHub"
+  $resourceGroupName = "wipro-rg"
+  $Location = "West India"
+  $storageaccountname = "Arrowsa"
+  #create EventHub
+  New-AzureRmEventHubNamespace -ResourceGroupName $resourceGroupName -NamespaceName $eventhubNS -Location $Location
+  New-AzureRmEventHub -ResourceGroupName $resourceGroupName -NamespaceName $eventhubNS -EventHubName $eventhubName -MessageRetentionInDays 3 -PartitionCount 2
+  
+  $NewEhubKeyName= New-AzureRmEventHubAuthorizationRule -ResourceGroupName $resourceGroupName -NamespaceName $eventhubNS -EventHubName $eventhubName -AuthorizationRuleName "mypolicy" -Rights @("Listen","Send")
+  $EhubKeyName = $NewEhubKeyName.Name
+     
+   $EhubGetKey = Get-AzureRmEventHubKey -ResourceGroupName $resourceGroupName -NamespaceName $eventhubNS -EventHubName $eventhubName -AuthorizationRuleName $EhubKeyName
+   $EhubKey = $EhubGetKey.PrimaryKey
+   #API Call
+   $method = "POST" 
+     $URI = "https://"+$eventhubNS+".servicebus.windows.net/$eventhubName/messages" 
+     Add-Type -AssemblyName System.Web 
+     $encodedURI = [System.Web.HttpUtility]::UrlEncode($URI) 
+     $keyname = $EhubKeyName 
+     $key = $EhubKey
+     $startDate = [datetime]�01/01/1970 00:00� 
+     $hour = New-TimeSpan -Hours 1
+
+    # Calculate expiry value one hour ahead
+    $sinceEpoch = NEW-TIMESPAN �Start $startDate �End ((Get-Date) + $hour)
+    $expiry = [Math]::Floor([decimal]($sinceEpoch.TotalSeconds + 3600))
+    # Create the signature
+    $stringToSign = $encodedURI + "`n" + $expiry
+    $hmacsha = New-Object System.Security.Cryptography.HMACSHA256
+    $hmacsha.key = [Text.Encoding]::ASCII.GetBytes($key)
+    $signature = $hmacsha.ComputeHash([Text.Encoding]::ASCII.GetBytes($stringToSign))
+    $signature = [System.Web.HttpUtility]::UrlEncode([Convert]::ToBase64String($signature))
+
+    # API headers
+    $headers = @{
+                "Authorization"="SharedAccessSignature sr=" + $encodedURI + "&sig=" + $signature + "&se=" + $expiry + "&skn=" + $keyname;
+                "Content-Type"="application/json;type=entry;charset=utf-8";
+                }
+ 
+        $bodyget = Invoke-RestMethod -Uri "http://localhost:3002/api/v1/arrowconnect/telemetry/devices/4bd684fcc3ccb2e513b1006b891bef78393a1930?fromTimestamp=2018-02-01T07%3A11%3A09.090Z&toTimestamp=2018-02-01T07%3A11%3A10.090Z"  | Select-Object -Property data | Select-Object -ExpandProperty data | ConvertTo-Json
+
+        # create Request Body 
+        $body = $bodyget
+        # execute the Azure REST API 
+        Invoke-RestMethod -Uri $URI -Method $method -Headers $headers -Body $body 
+        #create Storage Account
+      New-AzureRmStorageAccount -ResourceGroupName $resourceGroupName -AccountName $storageaccountname -Location $Location -SkuName "Standard_GRS"
+      $getsAKey = (Get-AzureRmStorageAccountKey -ResourceGroupName "ArrowRG1" -AccountName $storageaccountname).Value[0]
+         $pathToJson = "D:\JobDefinition.json"
+         $myJSONContent = Get-Content $pathToJson | ConvertFrom-Json
+         $myJSONContent.name =  $VMName+"StreamAn"
+         $StreamAnalyticsName = $myJSONContent.name
+         $myJSONContent.properties.inputs[0].properties.datasource.properties.eventHubName= $eventhubName
+         $myJSONContent.properties.inputs[0].properties.datasource.properties.serviceBusNamespace= $eventhubNS
+         $myJSONContent.properties.inputs[0].properties.datasource.properties.sharedAccessPolicyName= $keyname
+         $myJSONContent.properties.inputs[0].properties.datasource.properties.sharedAccessPolicyKey = $EhubKey
+         $SQLServer = $myJSONContent.properties.outputs[0].properties.datasource.properties.server
+         $SQLDB = $myJSONContent.properties.outputs[0].properties.datasource.properties.database
+         $SQLTable = $myJSONContent.properties.outputs[0].properties.datasource.properties.table
+         $SQLUserName = $myJSONContent.properties.outputs[0].properties.datasource.properties.user
+         $SQLPassword = $myJSONContent.properties.outputs[0].properties.datasource.properties.password
+
+     ConvertTo-Json -InputObject $myJSONContent -Depth 9 | set-content $pathToJson
+
+     #create Stream Analytics Job
+     New-AzureRmStreamAnalyticsJob -ResourceGroupName $resourceGroupName -File $pathToJson
+
+     #Start the Job
+     Start-AzureRmStreamAnalyticsJob -ResourceGroupName $resourceGroupName -Name $StreamAnalyticsName -OutputStartMode "CustomTime" -OutputStartTime "2014-07-03T01:00Z"
+
+$Imported = Import-Csv 'D:\AccountNew.csv'
+$Output = foreach ($i in $Imported) {
+           $name = $i."VM Name"
+        if ($name -eq $vmName)
+         { 
+            $i."Event hub" = $eventhubName
+            $i."EventHubNS" = $eventhubNS
+            $i."Event Hub Primary Key Name" = $EhubKeyName
+            $i."Event Hub Primary Key" = $EhubKey
+            $i."Storage Account" = $storageaccountname
+            $i."Storage Account Key" = $getsAKey
+            $i."SQL Server" = $SQLServer
+            $i."SQL Database" = $SQLDB
+            $i."SQL Table" = $SQLTable
+            $i."SQL UserName" = $SQLUserName
+            $i."SQL Password" = $SQLPassword
+            $i."StreamAnalytics" = $StreamAnalyticsName
+            
+         }
+         $i
+}
+# Add the updated Resources information into the csv
+$Output | Export-Csv 'D:\AccountNew.csv' -NoTypeInformation

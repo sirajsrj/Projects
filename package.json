@@ -1,0 +1,36 @@
+{
+  "name": "arrow",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "async": "^2.6.0",
+    "axios": "^0.17.1",
+    "body-parser": "^1.18.2",
+    "express": "^4.16.2",
+    "install": "^0.10.4",
+    "moment": "^2.20.1",
+    "npm": "^5.6.0",
+    "react": "^16.2.0",
+    "react-dom": "^16.2.0",
+    "react-paginate": "^5.0.0",
+    "react-router-dom": "^4.2.2",
+    "react-scripts": "1.1.0",
+    "react-table": "^6.7.6",
+    "request": "^2.83.0",
+    "socket.io": "^2.0.4",
+    "tedious": "^2.3.1",
+    "ws": "^4.0.0"
+  },
+  "scripts": {
+    "client": "react-scripts start",
+    "start": "node bin/www",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
+  },
+  "devDependencies": {
+    "cors": "^2.8.4",
+    "express-api-doc": "0.0.12",
+    "moment": "^2.20.1"
+  }
+}

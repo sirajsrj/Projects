@@ -1,0 +1,64 @@
+{   "name":"ArrowStreamAn",
+   "location":"Central India", 
+   "properties":{   
+      "sku":{   
+         "name":"standard"
+      }, 
+      "eventsOutOfOrderPolicy":"drop",
+      "eventsOutOfOrderMaxDelayInSeconds":10,
+      "compatibilityLevel": 1.1,
+      "inputs":[   
+         {   
+            "name":"MyEventHubSource",
+            "properties":{   
+               "type":"stream", 
+               "serialization":{   
+                  "type":"JSON", 
+                  "properties":{   
+                     "encoding":"UTF8" 
+                  } 
+               }, 
+               "datasource":{   
+                  "type":"Microsoft.ServiceBus/EventHub", 
+                  "properties":{   
+                     "serviceBusNamespace":"arrownew", 
+                     "sharedAccessPolicyName":"arrowpolicy", 
+                     "sharedAccessPolicyKey":"jrENCxDg5E9VoxCxFMmwRh56q+NGHV/bqAPBbEEo7+w=", 
+                     "eventHubName":"arrowehnew" 
+                  } 
+               } 
+            } 
+         }
+      ], 
+      "transformation":{   
+         "name":"ProcessSampleData", 
+         "properties":{   
+            "streamingUnits":1, 
+            "query":"select * into output from MyEventHubSource" 
+         } 
+      }, 
+      "outputs":[   
+         {   
+            "name":"output", 
+            "properties":{   
+               "datasource":{   
+                  "type":"Microsoft.Sql/Server/Database", 
+                  "properties":{   
+                     "server":"arrowserver.database.windows.net", 
+                     "database":"arrowDB", 
+                     "table":"ApiData1", 
+                     "user":"siraj_srj@arrowserver", 
+                     "password":"@skurdaD1" 
+                  } 
+
+               } 
+
+            } 
+
+         } 
+
+      ] 
+
+   } 
+
+}
